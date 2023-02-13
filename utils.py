@@ -1,6 +1,6 @@
 import json
 from time import sleep
-
+from webdriver_manager.chrome import ChromeDriverManager
 from selenium import webdriver
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.by import By
@@ -8,9 +8,9 @@ from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions
 from selenium.webdriver.support.wait import WebDriverWait
+import re
 
-
-with open("Facebook Marketplace Car Scraper\setup.json") as fin:
+with open("setup.json") as fin:
     setup = json.load(fin)
 
 # search queries
@@ -22,83 +22,79 @@ maxPrice = 2000
 sortby = 0  # 0-name, 1-price, 2-mileage, 3-loc
 
 
-def send(driver, cmd, params={}):
-    resource = "/session/%s/chromium/send_command_and_get_result" % driver.session_id
-    url = driver.command_executor._url + resource
-    body = json.dumps({'cmd': cmd, 'params': params})
-    response = driver.command_executor._request('POST', url, body)
-    return response.get('value')
-
-
 def save_page(url, fname):
     # open page
     options = webdriver.ChromeOptions()
     options.add_argument("--save-page-as-mhtml")
     options.add_argument("--disable-notifications")
-    browser = webdriver.Chrome(executable_path=(
-        setup['facebook']['WebDriver_Path']), options=options)
-    # Bypass facebook login
+    options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    options.add_experimental_option("useAutomationExtension", False)
+    options.add_argument('--allow-profiles-outside-user-dir')
+    options.add_argument('--enable-profile-shortcut-manager')
+    options.add_argument(r'user-data-dir=\User')
+    options.add_argument('--profile-directory=Profile0')
+    browser = webdriver.Chrome(executable_path=ChromeDriverManager().install(), options=options)
     browser.get(url)
-    browser.find_element(By.ID, "email").send_keys(setup['facebook']['email'])
-    browser.find_element(By.ID, "pass").send_keys(
-        setup['facebook']['password'])
-    browser.find_element(By.ID, "loginbutton").click()
-    sleep(5)
-    browser.find_element_by_xpath(
-        "/html/body/div[1]/div/div[1]/div/div[3]/div/div/div/div[1]/div[1]/div[1]/div/div[2]/div/div/div/span/div/div/div/div/label/input").click()
+
+    #write an authorization check
+    # Bypass facebook login
+    #The user logs in once. After the profile is saved
+    print('log in Browser')
+    while True:
+        try:
+            res =str( browser.page_source)
+            if res.find('class="x3ajldb"') != -1:
+                print('Successfully logged in')
+                break
+        except:
+            pass
+        sleep(1)
+
+    sleep(3)
+
+    edit_fullXpath = '/html/body/div[1]/div/div[1]/div/div[5]/div/div/div[3]/div/div/div[1]/div[1]/div[1]/div/div[2]/div/div/div/span/div/div/div/div/label/input'
+    edit_priceMinFullXpach = '/html/body/div[1]/div/div[1]/div/div[5]/div/div/div[3]/div/div/div[1]/div[1]/div[1]/div/div[3]/div[1]/div[2]/div[3]/div[2]/div[2]/div[3]/div[2]/span[1]/label/input'
+    edit_priceMaxFullXpach = '/html/body/div[1]/div/div[1]/div/div[5]/div/div/div[3]/div/div/div[1]/div[1]/div[1]/div/div[3]/div[1]/div[2]/div[3]/div[2]/div[2]/div[3]/div[2]/span[2]/label/input'
+
+
+    browser.find_element(By.XPATH, edit_fullXpath).click()
+    browser.find_element(By.XPATH, edit_fullXpath).clear()
+    browser.find_element(By.XPATH, edit_fullXpath).send_keys(setup['facebook']['query'])
+    browser.find_element(By.XPATH, edit_fullXpath).send_keys(Keys.ENTER)
     sleep(1)
-    browser.find_element_by_xpath(
-        "/html/body/div[1]/div/div[1]/div/div[3]/div/div/div/div[1]/div[1]/div[1]/div/div[2]/div/div/div/span/div/div/div/div/label/input").clear()
+
+    browser.find_element(By.XPATH, edit_priceMinFullXpach).click()
+    browser.find_element(By.XPATH, edit_priceMinFullXpach).clear()
+    browser.find_element(By.XPATH, edit_priceMinFullXpach).send_keys(setup['facebook']['minimum_price'])
+
+    browser.find_element(By.XPATH, edit_priceMaxFullXpach).click()
+    browser.find_element(By.XPATH, edit_priceMaxFullXpach).clear()
+    browser.find_element(By.XPATH, edit_priceMaxFullXpach).send_keys(setup['facebook']['maximum_price'])
+    browser.find_element(By.XPATH, edit_priceMaxFullXpach).send_keys(Keys.ENTER)
     sleep(1)
-    browser.find_element_by_xpath(
-        "/html/body/div[1]/div/div[1]/div/div[3]/div/div/div/div[1]/div[1]/div[1]/div/div[2]/div/div/div/span/div/div/div/div/label/input").send_keys(setup['facebook']['query'])
-    sleep(1)
-    browser.find_element_by_xpath(
-        "/html/body/div[1]/div/div[1]/div/div[3]/div/div/div/div[1]/div[1]/div[1]/div/div[2]/div/div/div/span/div/div/div/div/label/input").send_keys(Keys.ENTER)
-    sleep(1)
-    browser.find_element_by_xpath(
-        "/html/body/div[1]/div/div[1]/div/div[3]/div/div/div/div[1]/div[1]/div[1]/div/div[3]/div[1]/div[2]/div[3]/div[2]/div[2]/div[3]/div[2]/span[1]/label/input").click()
-    sleep(1)
-    browser.find_element_by_xpath(
-        "/html/body/div[1]/div/div[1]/div/div[3]/div/div/div/div[1]/div[1]/div[1]/div/div[3]/div[1]/div[2]/div[3]/div[2]/div[2]/div[3]/div[2]/span[1]/label/input").clear()
-    sleep(1)
-    browser.find_element_by_xpath(
-        "/html/body/div[1]/div/div[1]/div/div[3]/div/div/div/div[1]/div[1]/div[1]/div/div[3]/div[1]/div[2]/div[3]/div[2]/div[2]/div[3]/div[2]/span[1]/label/input").send_keys(setup['facebook']['minimum_price'])
-    sleep(1)
-    browser.find_element_by_xpath(
-        "/html/body/div[1]/div/div[1]/div/div[3]/div/div/div/div[1]/div[1]/div[1]/div/div[3]/div[1]/div[2]/div[3]/div[2]/div[2]/div[3]/div[2]/span[2]/label/input").click()
-    sleep(1)
-    browser.find_element_by_xpath(
-        "/html/body/div[1]/div/div[1]/div/div[3]/div/div/div/div[1]/div[1]/div[1]/div/div[3]/div[1]/div[2]/div[3]/div[2]/div[2]/div[3]/div[2]/span[2]/label/input").clear()
-    sleep(1)
-    browser.find_element_by_xpath(
-        "/html/body/div[1]/div/div[1]/div/div[3]/div/div/div/div[1]/div[1]/div[1]/div/div[3]/div[1]/div[2]/div[3]/div[2]/div[2]/div[3]/div[2]/span[2]/label/input").send_keys(setup['facebook']['maximum_price'])
-    sleep(1)
-    browser.find_element_by_xpath(
-        "/html/body/div[1]/div/div[1]/div/div[3]/div/div/div/div[1]/div[1]/div[1]/div/div[3]/div[1]/div[2]/div[3]/div[2]/div[2]/div[3]/div[2]/span[2]/label/input").send_keys(Keys.ENTER)
-    print(browser.current_url)
 
     # scroll
-    for i in range(3):
+    for i in range(int(setup['facebook']['pageCount'])):
         browser.execute_script(f"window.scrollTo(0, {4000*i})")
         sleep(2)
 
     # snapshot and save
-    res = send(browser, "Page.captureSnapshot", {"format": "mhtml"})
+    #res = send(browser, "Page.captureSnapshot", {"format": "mhtml"})
+    res = browser.page_source
 
-    resd = str(res['data']).replace("=\n\n", "")
     with open(fname, "w",  encoding='utf-8') as file:
-        file.write(resd)
+        file.write(res)
     return fname
 
 
 def get_price(pcl):
     # print(pcl[0].get_text().split("$"))
-    return "$"+str(int(pcl[0].get_text().split("$")[1].replace(",", "").replace("\n", "")))
+    return "$"+re.sub('\D', '', pcl[0].get_text())
 
 
 def get_mileage(pcl):
-    # return pcl[3].get_text().replace(" miles","")
+    #In development. rewrite the code.
+    return ""
     strmiles = pcl[3].get_text().split(" =")[0].replace(
         " miles", "").replace("K", "000").replace("M", "000000")
     if "." in strmiles:
